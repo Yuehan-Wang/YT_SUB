@@ -34,36 +34,57 @@ def get_recent_videos():
     return recent_videos[::-1]
 
 def get_transcript(video_id):
-    """通过 RapidAPI 获取字幕"""
+    """通过新的 RapidAPI (youtube-transcripts) 获取字幕"""
     try:
-        url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
-        querystring = {"video_id": video_id} 
+        # ⚠️ 注意：这个新 API 的路径后面带有 /youtube/transcript
+        url = "https://youtube-transcripts.p.rapidapi.com/youtube/transcript"
+        
+        # 传入视频 ID，同时加上 text=False (让它返回结构化数据方便我们解析)
+        querystring = {"videoId": video_id, "text": "false"} 
+
+        # 换上你最新指定的 Host
         headers = {
             "x-rapidapi-key": os.environ["RAPIDAPI_KEY"],
-            "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com"
+            "x-rapidapi-host": "youtube-transcripts.p.rapidapi.com"
         }
 
         response = requests.get(url, headers=headers, params=querystring)
         response.raise_for_status() 
         data = response.json()
         
+        # --- 错误拦截 ---
         if isinstance(data, dict) and "error" in data:
             error_msg = data["error"].lower()
             if "no subtitles" in error_msg or "not found" in error_msg:
                  print(f"API 明确返回无字幕错误: {data['error']}")
                  return None
 
+        # --- 万能 JSON 解析器 ---
+        # 1. 很多 API 会直接返回一个列表 [{text: "hello", ...}, {text: "world", ...}]
         if isinstance(data, list):
-            return " ".join([item.get('text', '') for item in data if 'text' in item])
+            extracted = " ".join([item.get('text', '') for item in data if isinstance(item, dict) and 'text' in item])
+            if extracted.strip(): return extracted
+            
+        # 2. 如果返回的是一个字典 {"content": [...]} 或 {"transcript": [...]}
         elif isinstance(data, dict):
-            if "transcript" in data:
-                return " ".join([item.get('text', '') for item in data['transcript']])
-            return str(data) 
-        else:
-            return str(data) 
+            # 暴力遍历字典里的所有键，寻找包含 'text' 的列表
+            for key, value in data.items():
+                if isinstance(value, list):
+                    extracted = " ".join([item.get('text', '') for item in value if isinstance(item, dict) and 'text' in item])
+                    if extracted.strip(): return extracted
+            
+            # 如果它直接返回了一个 {"text": "完整的一大段字幕..."}
+            if "text" in data and isinstance(data["text"], str):
+                return data["text"]
+
+        # 如果穷尽了所有标准解析都没找到，把原始数据转成文本强行喂给 AI
+        print("警告：无法精确提取 text 字段，已将原始 JSON 传给 AI。")
+        return str(data)
 
     except requests.exceptions.HTTPError as e:
         print(f"HTTP 错误: {e}")
+        # 打印出服务器的详细报错，方便我们查虫
+        print(f"详细报错信息: {e.response.text}")
         return None
     except Exception as e:
         print(f"获取字幕失败: {e}")
