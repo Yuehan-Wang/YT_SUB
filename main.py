@@ -27,7 +27,7 @@ def get_transcript(video_id):
     try:
         url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
         
-        querystring = {"video_id": video_id}
+        querystring = {"video_id": video_id} 
 
         headers = {
             "x-rapidapi-key": os.environ["RAPIDAPI_KEY"],
@@ -35,7 +35,6 @@ def get_transcript(video_id):
         }
 
         response = requests.get(url, headers=headers, params=querystring)
-        
         response.raise_for_status() 
         
         data = response.json()
@@ -56,11 +55,12 @@ def get_transcript(video_id):
     except Exception as e:
         print(f"通过 RapidAPI 获取字幕失败: {e}")
         return None
-    
+
 def summarize_with_gemini(text, title):
     """使用 Gemini 生成总结"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash') 
+    
+    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
     
     prompt = f"""
     你是一个专业的美股财经助理。以下是 YouTube 财经博主最新视频的完整字幕内容。
@@ -79,7 +79,7 @@ def summarize_with_gemini(text, title):
         return response.text
     except Exception as e:
         print(f"AI 生成总结失败: {e}")
-        return "AI 总结生成失败，请检查日志。"
+        return None 
 
 def send_email(subject, content):
     """发送邮件"""
@@ -121,11 +121,15 @@ def main():
     print("正在获取字幕...")
     transcript = get_transcript(video_id)
     if not transcript:
-        print("无法获取字幕，跳过 AI 总结。")
+        print("无法获取字幕，流程终止。")
         return
 
     print("正在请求 AI 总结...")
     summary = summarize_with_gemini(transcript, title)
+    
+    if not summary:
+        print("AI 总结失败，流程终止。")
+        return
 
     print("正在发送邮件...")
     email_subject = f"【RhinoFinance 更新】{title}"
