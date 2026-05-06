@@ -60,7 +60,7 @@ def summarize_with_gemini(text, title):
     """使用 Gemini 生成总结"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
     
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
+    model = genai.GenerativeModel('gemini-3-flash-preview') 
     
     prompt = f"""
     你是一个专业的美股财经助理。以下是 YouTube 财经博主最新视频的完整字幕内容。
