@@ -8,7 +8,7 @@ from email.mime.multipart import MIMEMultipart
 import google.generativeai as genai
 
 # ================= 配置区 =================
-CHANNEL_ID = "UCFQsi7WaF5X41tcuOryDk8w"  # RhinoFinance
+CHANNEL_ID = "UCFhJ8ZFg9W4kLwFTBBNIjOw" 
 RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
 STATE_FILE = "last_video.json"
 MY_STOCKS = "苹果(AAPL), 特斯拉(TSLA), 英伟达(NVDA), 微软(MSFT)"
