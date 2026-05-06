@@ -3,7 +3,7 @@ name: YouTube Daily Summary
 on:
   schedule:
     - cron: '0 1 * * *'
-  workflow_dispatch:
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -13,10 +13,10 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4  
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5 
       with:
         python-version: '3.10'
 
@@ -37,7 +37,11 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add last_video.json
-        # 如果文件没有变化，commit 会失败，所以加了 || echo "No changes to commit"
-        git commit -m "Update last processed video" || echo "No changes to commit"
-        git push
+        # 增加判断：只有当 json 文件存在时才去提交，防止 128 错误
+        if [ -f last_video.json ]; then
+          git add last_video.json
+          git commit -m "Update last processed video" || echo "No changes to commit"
+          git push || echo "Nothing to push"
+        else
+          echo "last_video.json does not exist. Skipping git commit."
+        fi
