@@ -13,7 +13,7 @@ import google.generativeai as genai
 CHANNEL_ID = "UCFhJ8ZFg9W4kLwFTBBNIjOw" 
 RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
 STATE_FILE = "last_video.json" 
-MY_STOCKS = "苹果(AAPL), 特斯拉(TSLA), 英伟达(NVDA), 微软(MSFT)"
+MY_STOCKS = "英伟达(NVDA), 微软(MSFT)，谷歌(GOOGL)，可口可乐(KO)，特斯拉(TSLA)，苹果(AAPL)，亚马逊(AMZN)，Meta(META)"
 # ==========================================
 
 def get_recent_videos():
@@ -24,7 +24,7 @@ def get_recent_videos():
     for entry in feed.entries:
         pub_time = datetime.fromtimestamp(time.mktime(entry.published_parsed), timezone.utc)
         
-        if now - pub_time <= timedelta(hours=3):
+        if now - pub_time <= timedelta(hours=10):
             recent_videos.append((entry.yt_videoid, entry.title))
             
     return recent_videos[::-1]
@@ -115,11 +115,11 @@ def send_email(subject, content):
         server.sendmail(sender, receiver, msg.as_string())
 
 def main():
-    print("开始检查过去 3小时内的视频...")
+    print("开始检查过去 10小时内的视频...")
     videos = get_recent_videos()
     
     if not videos:
-        print("过去 3小时内的视频。")
+        print("过去 10小时内的视频。")
         return
 
     processed_history = []
