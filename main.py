@@ -27,8 +27,7 @@ def get_transcript(video_id):
     try:
         url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
         
-        # 修复 400 错误：移除了不被支持的 lang 参数，只保留 videoId
-        querystring = {"videoId": video_id} 
+        querystring = {"video_id": video_id}
 
         headers = {
             "x-rapidapi-key": os.environ["RAPIDAPI_KEY"],
