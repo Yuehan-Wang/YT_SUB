@@ -8,7 +8,7 @@ from email.mime.multipart import MIMEMultipart
 import google.generativeai as genai
 
 # ================= 配置区 =================
-CHANNEL_ID = "UCFhJ8ZFg9W4kLwFTBBNIjOw" 
+CHANNEL_ID = "UCFhJ8ZFg9W4kLwFTBBNIjOw"  # NaNa说美股 的频道 ID
 RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
 STATE_FILE = "last_video.json"
 MY_STOCKS = "苹果(AAPL), 特斯拉(TSLA), 英伟达(NVDA), 微软(MSFT)"
@@ -23,7 +23,7 @@ def get_latest_video():
     return latest.yt_videoid, latest.title
 
 def get_transcript(video_id):
-    """通过 RapidAPI 获取字幕"""
+    """通过 RapidAPI (youtube-transcriptor) 获取字幕"""
     try:
         url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
         
@@ -36,9 +36,16 @@ def get_transcript(video_id):
 
         response = requests.get(url, headers=headers, params=querystring)
         response.raise_for_status() 
-        
         data = response.json()
         
+        # 【核心保护机制】：拦截 API 返回的无字幕错误
+        if isinstance(data, dict) and "error" in data:
+            error_msg = data["error"].lower()
+            if "no subtitles" in error_msg or "not found" in error_msg:
+                 print(f"API 明确返回无字幕错误: {data['error']}")
+                 return None
+
+        # 提取正常字幕文本的逻辑
         if isinstance(data, list):
             return " ".join([item.get('text', '') for item in data if 'text' in item])
         elif isinstance(data, dict):
@@ -57,10 +64,11 @@ def get_transcript(video_id):
         return None
 
 def summarize_with_gemini(text, title):
-    """使用 Gemini 生成总结"""
+    """使用 Gemini 2.5 Flash 生成总结"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
     
-    model = genai.GenerativeModel('gemini-3-flash-preview') 
+    # 使用最新的模型
+    model = genai.GenerativeModel('gemini-2.5-flash') 
     
     prompt = f"""
     你是一个专业的美股财经助理。以下是 YouTube 财经博主最新视频的完整字幕内容。
@@ -71,7 +79,7 @@ def summarize_with_gemini(text, title):
     1. 【大盘总结】：博主对今天宏观经济、美股三大指数的走势分析和未来预期。提取核心观点和关键点位。
     2. 【我的关注个股】：我关心的股票是：{MY_STOCKS}。请仔细在字幕中寻找博主是否提到了这几只股票。如果提到了，请详细总结他对这些股票的支撑位、阻力位、财报分析或操作建议；如果完全没提到，请直接说明“今日未提及”。
     
-    以下是视频字幕原文（或者是 JSON 格式的字幕数据）：
+    以下是视频字幕原文：
     {text}
     """
     try:
@@ -121,21 +129,22 @@ def main():
     print("正在获取字幕...")
     transcript = get_transcript(video_id)
     if not transcript:
-        print("无法获取字幕，流程终止。")
+        print("无法获取字幕，流程终止。不更新记录，留待下次重试。")
         return
 
     print("正在请求 AI 总结...")
     summary = summarize_with_gemini(transcript, title)
     
     if not summary:
-        print("AI 总结失败，流程终止。")
+        print("AI 总结失败，流程终止。不更新记录，留待下次重试。")
         return
 
     print("正在发送邮件...")
-    email_subject = f"【RhinoFinance 更新】{title}"
+    email_subject = f"【NaNa说美股 更新】{title}"
     send_email(email_subject, summary)
     print("邮件发送成功！")
 
+    # 只有当发完邮件后，才真正把视频 ID 写入记录
     with open(STATE_FILE, "w") as f:
         json.dump({"video_id": video_id, "title": title}, f)
     print("状态已更新。")
