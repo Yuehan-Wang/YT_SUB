@@ -27,7 +27,8 @@ def get_transcript(video_id):
     try:
         url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
         
-        querystring = {"videoId": video_id, "lang": "zh"} 
+        # 修复 400 错误：移除了不被支持的 lang 参数，只保留 videoId
+        querystring = {"videoId": video_id} 
 
         headers = {
             "x-rapidapi-key": os.environ["RAPIDAPI_KEY"],
@@ -35,21 +36,28 @@ def get_transcript(video_id):
         }
 
         response = requests.get(url, headers=headers, params=querystring)
+        
         response.raise_for_status() 
         
         data = response.json()
         
         if isinstance(data, list):
-            return " ".join([item.get('text', '') for item in data])
-        elif isinstance(data, dict) and "transcript" in data:
-            return " ".join([item.get('text', '') for item in data['transcript']])
+            return " ".join([item.get('text', '') for item in data if 'text' in item])
+        elif isinstance(data, dict):
+            if "transcript" in data:
+                return " ".join([item.get('text', '') for item in data['transcript']])
+            return str(data) 
         else:
             return str(data) 
 
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP 错误: {e}")
+        print(f"API 服务器返回的详细错误信息: {e.response.text}")
+        return None
     except Exception as e:
         print(f"通过 RapidAPI 获取字幕失败: {e}")
         return None
-
+    
 def summarize_with_gemini(text, title):
     """使用 Gemini 生成总结"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
