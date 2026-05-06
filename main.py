@@ -2,16 +2,17 @@ import os
 import json
 import feedparser
 import smtplib
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from youtube_transcript_api import YouTubeTranscriptApi
 import google.generativeai as genai
 
-CHANNEL_ID = "UCFQsi7WaF5X41tcuOryDk8w"  # RhinoFinance的频道ID
+# ================= 配置区 =================
+CHANNEL_ID = "UCFQsi7WaF5X41tcuOryDk8w"  # RhinoFinance
 RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
 STATE_FILE = "last_video.json"
-
-MY_STOCKS = "英伟达(NVDA), 微软(MSFT), 谷歌(GOOGL)"  
+MY_STOCKS = "苹果(AAPL), 特斯拉(TSLA), 英伟达(NVDA), 微软(MSFT)"
+# ==========================================
 
 def get_latest_video():
     """获取最新视频信息"""
@@ -22,14 +23,31 @@ def get_latest_video():
     return latest.yt_videoid, latest.title
 
 def get_transcript(video_id):
-    """获取视频中文字幕"""
+    """通过 RapidAPI 获取字幕"""
     try:
-        api = YouTubeTranscriptApi()
-        transcript_list = api.fetch(video_id, languages=['zh-Hans', 'zh-Hant', 'en'])
-        text = " ".join([t['text'] for t in transcript_list])
-        return text
+        url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
+        
+        querystring = {"videoId": video_id, "lang": "zh"} 
+
+        headers = {
+            "x-rapidapi-key": os.environ["RAPIDAPI_KEY"],
+            "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com"
+        }
+
+        response = requests.get(url, headers=headers, params=querystring)
+        response.raise_for_status() 
+        
+        data = response.json()
+        
+        if isinstance(data, list):
+            return " ".join([item.get('text', '') for item in data])
+        elif isinstance(data, dict) and "transcript" in data:
+            return " ".join([item.get('text', '') for item in data['transcript']])
+        else:
+            return str(data) 
+
     except Exception as e:
-        print(f"字幕获取失败: {e}")
+        print(f"通过 RapidAPI 获取字幕失败: {e}")
         return None
 
 def summarize_with_gemini(text, title):
@@ -46,7 +64,7 @@ def summarize_with_gemini(text, title):
     1. 【大盘总结】：博主对今天宏观经济、美股三大指数的走势分析和未来预期。提取核心观点和关键点位。
     2. 【我的关注个股】：我关心的股票是：{MY_STOCKS}。请仔细在字幕中寻找博主是否提到了这几只股票。如果提到了，请详细总结他对这些股票的支撑位、阻力位、财报分析或操作建议；如果完全没提到，请直接说明“今日未提及”。
     
-    以下是视频字幕原文：
+    以下是视频字幕原文（或者是 JSON 格式的字幕数据）：
     {text}
     """
     try:
@@ -54,7 +72,7 @@ def summarize_with_gemini(text, title):
         return response.text
     except Exception as e:
         print(f"AI 生成总结失败: {e}")
-        return "AI 总结生成失败，请检查 API 或日志。"
+        return "AI 总结生成失败，请检查日志。"
 
 def send_email(subject, content):
     """发送邮件"""
@@ -67,7 +85,6 @@ def send_email(subject, content):
     msg['From'] = sender
     msg['To'] = receiver
 
-    # 将 Markdown 转换为简单的 HTML，或者直接发纯文本。这里发送纯文本格式的 Markdown
     msg.attach(MIMEText(content, 'plain', 'utf-8'))
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
@@ -82,38 +99,32 @@ def main():
         print("未获取到视频信息。")
         return
 
-    # 读取上次处理的记录
     last_video_id = None
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r") as f:
             data = json.load(f)
             last_video_id = data.get("video_id")
 
-    # 对比是否为新视频
     if video_id == last_video_id:
         print(f"视频 {video_id} 已经处理过，任务结束。")
         return
 
     print(f"发现新视频：{title} (ID: {video_id})")
     
-    # 提取字幕
     print("正在获取字幕...")
     transcript = get_transcript(video_id)
     if not transcript:
         print("无法获取字幕，跳过 AI 总结。")
         return
 
-    # AI 总结
     print("正在请求 AI 总结...")
     summary = summarize_with_gemini(transcript, title)
 
-    # 发送邮件
     print("正在发送邮件...")
     email_subject = f"【RhinoFinance 更新】{title}"
     send_email(email_subject, summary)
     print("邮件发送成功！")
 
-    # 更新本地记录并保存
     with open(STATE_FILE, "w") as f:
         json.dump({"video_id": video_id, "title": title}, f)
     print("状态已更新。")
