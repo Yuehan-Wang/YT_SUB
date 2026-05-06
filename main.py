@@ -24,7 +24,8 @@ def get_latest_video():
 def get_transcript(video_id):
     """获取视频中文字幕"""
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['zh-Hans', 'zh-Hant', 'en'])
+        api = YouTubeTranscriptApi()
+        transcript_list = api.fetch(video_id, languages=['zh-Hans', 'zh-Hant', 'en'])
         text = " ".join([t['text'] for t in transcript_list])
         return text
     except Exception as e:
