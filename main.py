@@ -24,7 +24,7 @@ def get_recent_videos():
     for entry in feed.entries:
         pub_time = datetime.fromtimestamp(time.mktime(entry.published_parsed), timezone.utc)
         
-        if now - pub_time <= timedelta(hours=10):
+        if now - pub_time <= timedelta(hours=15):
             recent_videos.append((entry.yt_videoid, entry.title))
             
     return recent_videos[::-1]
@@ -115,11 +115,11 @@ def send_email(subject, content):
         server.sendmail(sender, receiver, msg.as_string())
 
 def main():
-    print("开始检查过去 10小时内的视频...")
+    print("开始检查过去 15小时内的视频...")
     videos = get_recent_videos()
     
     if not videos:
-        print("过去 10小时内的视频。")
+        print("过去 15小时内的视频。")
         return
 
     processed_history = []
